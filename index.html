@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Gallery & Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        .message-bubble.user {
+            background-color: #d1fae5;
+            align-self: flex-end;
+            border-bottom-right-radius: 0;
+        }
+        .message-bubble.bot {
+            background-color: #e5e7eb;
+            align-self: flex-start;
+            border-bottom-left-radius: 0;
+        }
+        .message-bubble img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-8 space-y-6">
+        <h1 class="text-3xl font-bold text-center text-gray-800">
+            Image Gallery & Sharing
+        </h1>
+        <p class="text-center text-gray-500">
+            Select an image file to add it to your gallery.
+        </p>
+
+        <label for="image-upload" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors duration-200">
+            <div class="text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4v-1a4 4 0 014-4h10a4 4 0 014 4v1a4 4 0 01-4 4H7z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <p class="mt-2 text-sm text-gray-600 font-semibold">
+                    Click to upload
+                </p>
+                <p class="text-xs text-gray-500">
+                    PNG, JPG, GIF up to 10MB
+                </p>
+            </div>
+        </label>
+        <input type="file" id="image-upload" accept="image/*">
+
+        <div id="image-gallery-container" class="mt-6 hidden space-y-4">
+            <h2 class="text-xl font-semibold text-gray-800">Uploaded Images</h2>
+            <div id="image-gallery" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                </div>
+            
+            <button id="share-button" class="hidden w-full flex items-center justify-center px-4 py-3 mt-4 text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <span class="mr-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-square-share">
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"/><path d="m17 2-4 4 4 4"/><path d="M13 6h8v8"/>
+                    </svg>
+                </span>
+                Share Last Uploaded Image
+            </button>
+        </div>
+
+        <div id="chat-container" class="hidden mt-6 bg-gray-100 p-4 rounded-xl shadow-inner">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Chat with your friend</h2>
+            <div id="message-log" class="flex flex-col space-y-4">
+                </div>
+            <div id="loading-indicator" class="hidden text-center mt-4">
+                <p class="text-sm text-gray-500 animate-pulse">Your friend is typing...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Get the DOM elements
+        const imageUpload = document.getElementById('image-upload');
+        const imageGallery = document.getElementById('image-gallery');
+        const galleryContainer = document.getElementById('image-gallery-container');
+        const shareButton = document.getElementById('share-button');
+        const chatContainer = document.getElementById('chat-container');
+        const messageLog = document.getElementById('message-log');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        // Global variable to store the last uploaded image data
+        let lastUploadedImage = null;
+
+        // Function to create and append a new chat message
+        function createMessage(content, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message-bubble', type, 'p-4', 'rounded-xl', 'max-w-[80%]', 'relative', 'shadow-md');
+            if (type === 'user') {
+                messageDiv.classList.add('ml-auto');
+            } else {
+                messageDiv.classList.add('mr-auto');
+            }
+            if (content.tagName === 'IMG') {
+                messageDiv.appendChild(content);
+            } else {
+                messageDiv.innerHTML = content;
+            }
+            messageLog.appendChild(messageDiv);
+            messageLog.scrollTop = messageLog.scrollHeight;
+        }
+
+        // Main event listener for file upload
+        imageUpload.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                // Clear any previous chat messages and hide chat container
+                messageLog.innerHTML = '';
+                chatContainer.classList.add('hidden');
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const newImage = document.createElement('img');
+                    newImage.src = e.target.result;
+                    newImage.alt = "Uploaded image";
+                    newImage.classList.add('w-full', 'h-auto', 'rounded-lg', 'shadow-md', 'object-cover', 'transition-opacity', 'duration-300');
+                    
+                    // Add the new image to the gallery
+                    imageGallery.appendChild(newImage);
+
+                    // Store the data of the newly uploaded image
+                    lastUploadedImage = {
+                        src: newImage.src,
+                        mimeType: file.type
+                    };
+
+                    // Show the gallery and share button
+                    galleryContainer.classList.remove('hidden');
+                    shareButton.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Event listener for the share button
+        shareButton.addEventListener('click', async function() {
+            if (!lastUploadedImage) {
+                return; // Do nothing if no image is uploaded
+            }
+
+            // Hide the share button and show the chat container
+            shareButton.classList.add('hidden');
+            chatContainer.classList.remove('hidden');
+            
+            // Get the image data from the last uploaded image
+            const [mimeType, base64Data] = lastUploadedImage.src.split(';base64,');
+
+            // Display the user's message (the image)
+            const userImageElement = document.createElement('img');
+            userImageElement.src = lastUploadedImage.src;
+            userImageElement.alt = "Uploaded image";
+            createMessage(userImageElement, 'user');
+
+            // Show a loading indicator
+            loadingIndicator.classList.remove('hidden');
+
+            // Call the Gemini API
+            try {
+                // Exponential backoff retry logic
+                let response;
+                let result;
+                let success = false;
+                let retries = 0;
+                const maxRetries = 5;
+                const baseDelay = 1000;
+
+                while (!success && retries < maxRetries) {
+                    try {
+                        const chatHistory = [
+                            { 
+                                role: "user", 
+                                parts: [
+                                    { text: "I just received this image. Please provide a friendly and engaging comment about it, as if you're a friend." },
+                                    {
+                                        inlineData: {
+                                            mimeType: mimeType.split(':')[1],
+                                            data: base64Data
+                                        }
+                                    }
+                                ] 
+                            }
+                        ];
+                        const payload = { contents: chatHistory };
+                        const apiKey = "";
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                        
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.status === 429) {
+                            const delay = baseDelay * Math.pow(2, retries);
+                            console.log(`Rate limit exceeded. Retrying in ${delay / 1000}s...`);
+                            await new Promise(res => setTimeout(res, delay));
+                            retries++;
+                            continue;
+                        }
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        result = await response.json();
+                        success = true;
+                    } catch (error) {
+                        if (retries < maxRetries - 1) {
+                            const delay = baseDelay * Math.pow(2, retries);
+                            console.error(`Fetch failed, retrying in ${delay / 1000}s...`, error);
+                            await new Promise(res => setTimeout(res, delay));
+                            retries++;
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+
+                if (!success) {
+                    throw new Error("API request failed after multiple retries.");
+                }
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    createMessage(text, 'bot');
+                } else {
+                    createMessage("Sorry, I couldn't generate a response for that image.", 'bot');
+                }
+
+            } catch (error) {
+                console.error("Error calling Gemini API:", error);
+                createMessage("An error occurred. Please try again later.", 'bot');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+                                                </html>
+  
